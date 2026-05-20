@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudVerse 後台管理</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0d1117;
+            color: #e0e0e0;
+            line-height: 1.6;
+        }
+
+        /* ── 登入頁 ── */
+        #loginPage {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0a0e27, #050812);
+        }
+
+        .login-box {
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(0,212,255,0.25);
+            border-radius: 20px;
+            padding: 3rem;
+            width: 380px;
+            text-align: center;
+        }
+
+        .login-box h1 {
+            font-size: 1.8rem;
+            background: linear-gradient(135deg, #00d4ff, #ffd700);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.3rem;
+        }
+
+        .login-box p { color: rgba(224,224,224,0.5); margin-bottom: 1.5rem; }
+
+        .login-box input {
+            width: 100%;
+            padding: 0.9rem 1rem;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(0,212,255,0.3);
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .login-box input:focus { outline: none; border-color: #00d4ff; }
+
+        .login-btn {
+            width: 100%;
+            padding: 0.9rem;
+            background: linear-gradient(135deg, #00d4ff, #ffd700);
+            color: #000;
+            font-weight: 700;
+            font-size: 1rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .login-btn:hover { opacity: 0.9; }
+
+        /* ── 後台框架 ── */
+        #adminPanel { display: none; }
+
+        .layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* ── 側邊欄 ── */
+        .sidebar {
+            width: 230px;
+            min-width: 230px;
+            background: #161b27;
+            border-right: 1px solid rgba(0,212,255,0.1);
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .sidebar-brand {
+            padding: 1.5rem;
+            font-weight: 700;
+            font-size: 1.1rem;
+            background: linear-gradient(135deg, #00d4ff, #ffd700);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            border-bottom: 1px solid rgba(0,212,255,0.1);
+        }
+
+        .sidebar-brand span {
+            display: block;
+            font-size: 0.75rem;
+            color: rgba(224,224,224,0.4);
+            -webkit-text-fill-color: rgba(224,224,224,0.4);
+            background: none;
+            font-weight: 400;
+            margin-top: 0.2rem;
+        }
+
+        .nav-section {
+            padding: 1rem 0;
+        }
+
+        .nav-label {
+            padding: 0.4rem 1.5rem;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: rgba(224,224,224,0.3);
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.75rem 1.5rem;
+            color: rgba(224,224,224,0.6);
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+            font-size: 0.9rem;
+        }
+
+        .nav-item:hover {
+            color: #00d4ff;
+            background: rgba(0,212,255,0.07);
+        }
+
+        .nav-item.active {
+            color: #00d4ff;
+            background: rgba(0,212,255,0.1);
+            border-left-color: #00d4ff;
+            font-weight: 600;
+        }
+
+        .nav-item .icon { font-size: 1rem; }
+
+        .logout-item {
+            margin-top: auto;
+            padding: 1rem 1.5rem;
+            color: #f44336;
+            cursor: pointer;
+            border-top: 1px solid rgba(0,212,255,0.1);
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        .logout-item:hover { background: rgba(244,67,54,0.1); }
+
+        /* ── 主內容 ── */
+        .main {
+            margin-left: 230px;
+            flex: 1;
+            padding: 2rem 3rem;
+            max-width: calc(100% - 230px);
+        }
+
+        /* ── 通知條 ── */
+        #toast {
+            position: fixed;
+            top: 1.5rem;
+            right: 1.5rem;
+            z-index: 9999;
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            display: none;
+            animation: slideIn 0.3s ease;
+            max-width: 300px;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        #toast.success { background: rgba(76,175,80,0.2); color: #4caf50; border: 1px solid rgba(76,175,80,0.5); }
+        #toast.error   { background: rgba(244,67,54,0.2);  color: #f44336; border: 1px solid rgba(244,67,54,0.5); }
+        #toast.info    { background: rgba(0,212,255,0.15); color: #00d4ff; border: 1px solid rgba(0,212,255,0.4); }
+
+        /* ── 面板 ── */
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        .panel-header {
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(0,212,255,0.1);
+        }
+
+        .panel-header h2 {
+            font-size: 1.6rem;
+            margin-bottom: 0.3rem;
+        }
+
+        .panel-header p { color: rgba(224,224,224,0.5); font-size: 0.9rem; }
+
+        /* ── 卡片 ── */
+        .card {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(0,212,255,0.12);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #ffd700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* ── 表單元件 ── */
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .form-row.single { grid-template-columns: 1fr; }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: rgba(0,212,255,0.8);
+            margin-bottom: 0.4rem;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 0.7rem 0.9rem;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(0,212,255,0.2);
+            border-radius: 7px;
+            color: #e0e0e0;
+            font-family: inherit;
+            font-size: 0.9rem;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus { outline: none; border-color: #00d4ff; background: rgba(0,212,255,0.05); }
+
+        .form-group textarea { resize: vertical; min-height: 80px; }
+
+        .form-group .hint { font-size: 0.75rem; color: rgba(224,224,224,0.35); margin-top: 0.3rem; }
+
+        /* ── 按鈕 ── */
+        .btn-group { display: flex; gap: 0.8rem; margin-top: 1.5rem; }
+
+        .btn {
+            padding: 0.7rem 1.5rem;
+            border: none;
+            border-radius: 7px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            color: #000;
+        }
+
+        .btn-primary:hover { opacity: 0.85; transform: translateY(-1px); }
+
+        .btn-danger {
+            background: rgba(244,67,54,0.15);
+            color: #f44336;
+            border: 1px solid rgba(244,67,54,0.3);
+        }
+
+        .btn-danger:hover { background: rgba(244,67,54,0.25); }
+
+        /* ── 表格 ── */
+        .table-wrapper { overflow-x: auto; border-radius: 10px; border: 1px solid rgba(0,212,255,0.12); }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead th {
+            background: rgba(0,212,255,0.08);
+            padding: 1rem 1.2rem;
+            text-align: left;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #00d4ff;
+            white-space: nowrap;
+        }
+
+        tbody td {
+            padding: 0.9rem 1.2rem;
+            border-top: 1px solid rgba(0,212,255,0.07);
+            font-size: 0.88rem;
+            vertical-align: top;
+        }
+
+        tbody tr:hover { background: rgba(0,212,255,0.04); }
+
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-blue { background: rgba(0,212,255,0.15); color: #00d4ff; }
+
+        /* ── 状态标签 ── */
+        .loading-text { color: rgba(224,224,224,0.4); font-size: 0.9rem; padding: 1rem 0; }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: rgba(224,224,224,0.3);
+        }
+
+        /* ── 同步说明 ── */
+        .sync-note {
+            background: rgba(255,215,0,0.07);
+            border: 1px solid rgba(255,215,0,0.2);
+            border-radius: 8px;
+            padding: 0.8rem 1rem;
+            font-size: 0.82rem;
+            color: rgba(255,215,0,0.8);
+            margin-bottom: 1.5rem;
+            display: flex;
+            gap: 0.5rem;
+            align-items: flex-start;
+        }
+    </style>
+</head>
+<body>
+
+<!-- 登入 -->
+<div id="loginPage">
+    <div class="login-box">
+        <h1>⚡ CloudVerse</h1>
+        <p>後台內容管理系統</p>
+        <input type="password" id="adminPassword" placeholder="輸入管理員密碼"
+               onkeydown="if(event.key==='Enter') doLogin()">
+        <button class="login-btn" onclick="doLogin()">進入後台</button>
+        <p style="margin-top:1rem; font-size:0.8rem; color:rgba(255,255,255,0.3);">預設密碼：admin123</p>
+    </div>
+</div>
+
+<!-- 後台 -->
+<div id="adminPanel">
+    <div class="layout">
+
+        <!-- 側邊欄 -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">CloudVerse Admin<span>內容管理系統</span></div>
+
+            <nav class="nav-section">
+                <div class="nav-label">內容編輯</div>
+                <div class="nav-item active" onclick="showPanel('hero', this)">
+                    <span class="icon">🏠</span> Hero 首屏
+                </div>
+                <div class="nav-item" onclick="showPanel('services', this)">
+                    <span class="icon">🔧</span> 服務卡片
+                </div>
+                <div class="nav-item" onclick="showPanel('stats', this)">
+                    <span class="icon">📊</span> 統計數字
+                </div>
+                <div class="nav-item" onclick="showPanel('certs', this)">
+                    <span class="icon">🏆</span> 認證徽章
+                </div>
+                <div class="nav-item" onclick="showPanel('industries', this)">
+                    <span class="icon">🏭</span> 行業方案
+                </div>
+            </nav>
+
+            <nav class="nav-section" style="border-top:1px solid rgba(0,212,255,0.1);">
+                <div class="nav-label">資料管理</div>
+                <div class="nav-item" onclick="showPanel('submissions', this)">
+                    <span class="icon">📋</span> 表單提交
+                </div>
+            </nav>
+
+            <div class="logout-item" onclick="doLogout()">🚪 登出</div>
+        </aside>
+
+        <!-- 主區域 -->
+        <main class="main">
+            <div id="toast"></div>
+
+            <!-- Hero 面板 -->
+            <div id="panel-hero" class="panel active">
+                <div class="panel-header">
+                    <h2>🏠 Hero 首屏內容</h2>
+                    <p>修改網站首頁大標題和描述文字</p>
+                </div>
+                <div class="sync-note">💡 儲存後請回到首頁按 Ctrl+Shift+R 強制刷新，才能看到更新</div>
+                <div class="card">
+                    <div class="card-title">✏️ 編輯標題</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>主標題（粗體字）</label>
+                            <input type="text" id="hero-title" placeholder="例：驅動台灣企業">
+                        </div>
+                        <div class="form-group">
+                            <label>副標題（漸層色字）</label>
+                            <input type="text" id="hero-subtitle" placeholder="例：雲端轉型之旅">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>描述文字</label>
+                        <textarea id="hero-desc" rows="3" placeholder="首屏的說明文字"></textarea>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="saveHero()">💾 儲存 Hero</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Services 面板 -->
+            <div id="panel-services" class="panel">
+                <div class="panel-header">
+                    <h2>🔧 服務卡片</h2>
+                    <p>編輯三張服務卡片的圖示、標題和描述</p>
+                </div>
+                <div class="sync-note">💡 修改任一欄位後，點擊該卡片的「儲存」按鈕即可更新</div>
+                <div id="services-list"><p class="loading-text">載入中...</p></div>
+            </div>
+
+            <!-- Stats 面板 -->
+            <div id="panel-stats" class="panel">
+                <div class="panel-header">
+                    <h2>📊 統計數字</h2>
+                    <p>編輯首頁的四個關鍵數字指標</p>
+                </div>
+                <div class="sync-note">💡 修改後點擊「儲存」即可同步到前台</div>
+                <div id="stats-list"><p class="loading-text">載入中...</p></div>
+            </div>
+
+            <!-- Certifications 面板 -->
+            <div id="panel-certs" class="panel">
+                <div class="panel-header">
+                    <h2>🏆 認證徽章</h2>
+                    <p>編輯顯示在認證區域的四個合作夥伴徽章</p>
+                </div>
+                <div class="sync-note">💡 修改後點擊「儲存」即可同步到前台</div>
+                <div id="certs-list"><p class="loading-text">載入中...</p></div>
+            </div>
+
+            <!-- Industries 面板 -->
+            <div id="panel-industries" class="panel">
+                <div class="panel-header">
+                    <h2>🏭 行業方案</h2>
+                    <p>編輯半導體和金融行業的解決方案卡片</p>
+                </div>
+                <div class="sync-note">💡 Benefits 為優勢條目，每行一個。修改後點擊「儲存」同步</div>
+                <div id="industries-list"><p class="loading-text">載入中...</p></div>
+            </div>
+
+            <!-- Submissions 面板 -->
+            <div id="panel-submissions" class="panel">
+                <div class="panel-header">
+                    <h2>📋 表單提交記錄</h2>
+                    <p>查看所有透過官網提交的詢問記錄</p>
+                </div>
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                        <span id="submissions-count" style="color:rgba(224,224,224,0.5); font-size:0.85rem;"></span>
+                        <button class="btn btn-primary" onclick="loadSubmissions()">🔄 重新整理</button>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>姓名</th>
+                                    <th>公司</th>
+                                    <th>電話</th>
+                                    <th>電郵</th>
+                                    <th>需求說明</th>
+                                    <th>提交時間</th>
+                                </tr>
+                            </thead>
+                            <tbody id="submissions-body">
+                                <tr><td colspan="6" class="empty-state">載入中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<script>
+const SUPABASE_URL  = 'https://euirazpintnlbfhymtbj.supabase.co';
+const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV1aXJhenBpbnRubGJmaHltdGJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNTE4NTksImV4cCI6MjA5NDgyNzg1OX0.7RHJ2CYkkHoxL-x51tfqVUzuTJJkHGJQSsihzXCRtpg';
+
+let db;
+try {
+    db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+} catch(e) {
+    console.error('Supabase init failed', e);
+}
+
+// ── 工具 ──────────────────────────────
+function toast(msg, type = 'success') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = type;
+    el.style.display = 'block';
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => { el.style.display = 'none'; }, 3500);
+}
+
+// ── 登入 / 登出 ───────────────────────
+function doLogin() {
+    const pw = document.getElementById('adminPassword').value;
+    if (pw === 'admin123') {
+        document.getElementById('loginPage').style.display = 'none';
+        document.getElementById('adminPanel').style.display = 'block';
+        loadAll();
+    } else {
+        toast('❌ 密碼錯誤', 'error');
+    }
+}
+
+function doLogout() {
+    document.getElementById('loginPage').style.display = 'flex';
+    document.getElementById('adminPanel').style.display = 'none';
+    document.getElementById('adminPassword').value = '';
+}
+
+// ── 面板切換 ──────────────────────────
+function showPanel(name, el) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('panel-' + name).classList.add('active');
+    if (el) el.classList.add('active');
+}
+
+// ── 載入所有資料 ──────────────────────
+async function loadAll() {
+    loadHero();
+    loadServices();
+    loadStats();
+    loadCerts();
+    loadIndustries();
+    loadSubmissions();
+}
+
+// ── Hero ──────────────────────────────
+let heroId = null;
+
+async function loadHero() {
+    const { data, error } = await db.from('content_hero').select('*').limit(1).single();
+    if (error) { toast('Hero 載入失敗: ' + error.message, 'error'); return; }
+    if (data) {
+        heroId = data.id;
+        document.getElementById('hero-title').value   = data.title   || '';
+        document.getElementById('hero-subtitle').value = data.subtitle || '';
+        document.getElementById('hero-desc').value    = data.description || '';
+    }
+}
+
+async function saveHero() {
+    const payload = {
+        title:       document.getElementById('hero-title').value,
+        subtitle:    document.getElementById('hero-subtitle').value,
+        description: document.getElementById('hero-desc').value
+    };
+    const query = heroId
+        ? db.from('content_hero').update(payload).eq('id', heroId)
+        : db.from('content_hero').insert([payload]);
+    const { error } = await query;
+    if (error) { toast('❌ 儲存失敗: ' + error.message, 'error'); }
+    else        { toast('✅ Hero 已儲存！'); }
+}
+
+// ── Services ──────────────────────────
+async function loadServices() {
+    const { data, error } = await db.from('content_services').select('*').order('service_order');
+    if (error) { document.getElementById('services-list').innerHTML = '<p style="color:#f44336">載入失敗: ' + error.message + '</p>'; return; }
+
+    const container = document.getElementById('services-list');
+    if (!data || data.length === 0) { container.innerHTML = '<p class="loading-text">沒有服務資料</p>'; return; }
+
+    container.innerHTML = data.map(s => `
+        <div class="card" id="svc-card-${s.id}">
+            <div class="card-title">📌 服務 ${s.service_order} — ${s.title || '未命名'}</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>圖示 Emoji</label>
+                    <input type="text" id="svc-icon-${s.id}" value="${s.icon || ''}" placeholder="例：☁️">
+                </div>
+                <div class="form-group">
+                    <label>標題</label>
+                    <input type="text" id="svc-title-${s.id}" value="${esc(s.title)}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>描述</label>
+                <textarea id="svc-desc-${s.id}" rows="2">${esc(s.description)}</textarea>
+            </div>
+            <div class="form-group">
+                <label>項目列表</label>
+                <textarea id="svc-items-${s.id}" rows="4" placeholder="每行一個項目">${Array.isArray(s.items) ? s.items.join('\n') : (s.items || '')}</textarea>
+                <p class="hint">每行輸入一個列表項目，前台會自動顯示為列表</p>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="saveService(${s.id})">💾 儲存服務 ${s.service_order}</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function saveService(id) {
+    const items = document.getElementById('svc-items-' + id).value
+        .split('\n').map(x => x.trim()).filter(Boolean);
+    const payload = {
+        icon:        document.getElementById('svc-icon-' + id).value,
+        title:       document.getElementById('svc-title-' + id).value,
+        description: document.getElementById('svc-desc-' + id).value,
+        items:       items
+    };
+    const { error } = await db.from('content_services').update(payload).eq('id', id);
+    if (error) { toast('❌ 儲存失敗: ' + error.message, 'error'); }
+    else        { toast('✅ 服務已儲存！'); loadServices(); }
+}
+
+// ── Stats ─────────────────────────────
+async function loadStats() {
+    const { data, error } = await db.from('content_stats').select('*').order('stat_order');
+    if (error) { document.getElementById('stats-list').innerHTML = '<p style="color:#f44336">載入失敗</p>'; return; }
+
+    const container = document.getElementById('stats-list');
+    if (!data || data.length === 0) { container.innerHTML = '<p class="loading-text">沒有統計資料</p>'; return; }
+
+    container.innerHTML = `
+        <div class="card">
+            <div class="card-title">📊 統計數據</div>
+            ${data.map(s => `
+                <div style="display:grid; grid-template-columns:1fr 2fr; gap:1rem; margin-bottom:1rem; padding-bottom:1rem; border-bottom:1px solid rgba(0,212,255,0.08);">
+                    <div class="form-group" style="margin:0">
+                        <label>數字 #${s.stat_order}</label>
+                        <input type="text" id="stat-num-${s.id}" value="${esc(s.number)}">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                        <label>標籤說明</label>
+                        <input type="text" id="stat-lbl-${s.id}" value="${esc(s.label)}">
+                    </div>
+                </div>
+                <div class="btn-group" style="margin-top:0.2rem; margin-bottom:1.5rem;">
+                    <button class="btn btn-primary" onclick="saveStat(${s.id})">💾 儲存統計 ${s.stat_order}</button>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+async function saveStat(id) {
+    const payload = {
+        number: document.getElementById('stat-num-' + id).value,
+        label:  document.getElementById('stat-lbl-' + id).value
+    };
+    const { error } = await db.from('content_stats').update(payload).eq('id', id);
+    if (error) { toast('❌ 儲存失敗: ' + error.message, 'error'); }
+    else        { toast('✅ 統計已儲存！'); }
+}
+
+// ── Certifications ────────────────────
+async function loadCerts() {
+    const { data, error } = await db.from('content_certifications').select('*').order('cert_order');
+    if (error) { document.getElementById('certs-list').innerHTML = '<p style="color:#f44336">載入失敗</p>'; return; }
+
+    const container = document.getElementById('certs-list');
+    if (!data || data.length === 0) { container.innerHTML = '<p class="loading-text">沒有認證資料</p>'; return; }
+
+    container.innerHTML = data.map(c => `
+        <div class="card" id="cert-card-${c.id}">
+            <div class="card-title">🏆 認證 ${c.cert_order}</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>圖示 Emoji</label>
+                    <input type="text" id="cert-icon-${c.id}" value="${esc(c.icon)}" placeholder="例：🏅">
+                </div>
+                <div class="form-group">
+                    <label>標題</label>
+                    <input type="text" id="cert-title-${c.id}" value="${esc(c.title)}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>副標題</label>
+                <input type="text" id="cert-sub-${c.id}" value="${esc(c.subtitle)}">
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="saveCert(${c.id})">💾 儲存認證 ${c.cert_order}</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function saveCert(id) {
+    const payload = {
+        icon:     document.getElementById('cert-icon-' + id).value,
+        title:    document.getElementById('cert-title-' + id).value,
+        subtitle: document.getElementById('cert-sub-' + id).value
+    };
+    const { error } = await db.from('content_certifications').update(payload).eq('id', id);
+    if (error) { toast('❌ 儲存失敗: ' + error.message, 'error'); }
+    else        { toast('✅ 認證已儲存！'); loadCerts(); }
+}
+
+// ── Industries ────────────────────────
+async function loadIndustries() {
+    const { data, error } = await db.from('content_industries').select('*').order('industry_type').order('plan_order');
+    if (error) { document.getElementById('industries-list').innerHTML = '<p style="color:#f44336">載入失敗</p>'; return; }
+
+    const container = document.getElementById('industries-list');
+    if (!data || data.length === 0) { container.innerHTML = '<p class="loading-text">沒有行業資料</p>'; return; }
+
+    const semis  = data.filter(d => d.industry_type === 'semiconductor');
+    const fins   = data.filter(d => d.industry_type === 'finance');
+
+    const renderGroup = (list, label) => `
+        <div class="card-title" style="font-size:1rem; margin-bottom:1rem;">${label}</div>
+        ${list.map(p => `
+            <div style="background:rgba(0,212,255,0.03); border:1px solid rgba(0,212,255,0.1); border-radius:8px; padding:1.2rem; margin-bottom:1rem;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>方案 ${p.plan_order} 標題</label>
+                        <input type="text" id="ind-title-${p.id}" value="${esc(p.title)}">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>描述</label>
+                    <textarea id="ind-desc-${p.id}" rows="2">${esc(p.description)}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>優勢條目（每行一個）</label>
+                    <textarea id="ind-ben-${p.id}" rows="4">${Array.isArray(p.benefits) ? p.benefits.join('\n') : (p.benefits || '')}</textarea>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="saveIndustry(${p.id})">💾 儲存方案 ${p.plan_order}</button>
+                </div>
+            </div>
+        `).join('')}
+    `;
+
+    container.innerHTML = `
+        <div class="card">${renderGroup(semis, '🔬 半導體行業')}</div>
+        <div class="card">${renderGroup(fins,  '🏦 金融行業')}</div>
+    `;
+}
+
+async function saveIndustry(id) {
+    const benefits = document.getElementById('ind-ben-' + id).value
+        .split('\n').map(x => x.trim()).filter(Boolean);
+    const payload = {
+        title:       document.getElementById('ind-title-' + id).value,
+        description: document.getElementById('ind-desc-' + id).value,
+        benefits:    benefits
+    };
+    const { error } = await db.from('content_industries').update(payload).eq('id', id);
+    if (error) { toast('❌ 儲存失敗: ' + error.message, 'error'); }
+    else        { toast('✅ 行業方案已儲存！'); }
+}
+
+// ── Form Submissions ──────────────────
+async function loadSubmissions() {
+    const tbody = document.getElementById('submissions-body');
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">載入中...</td></tr>';
+
+    const { data, error } = await db.from('form_submissions').select('*').order('created_at', { ascending: false });
+
+    if (error) {
+        tbody.innerHTML = `<tr><td colspan="6" style="color:#f44336; padding:1rem;">載入失敗: ${error.message}</td></tr>`;
+        return;
+    }
+
+    document.getElementById('submissions-count').textContent = `共 ${data?.length || 0} 筆記錄`;
+
+    if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">還沒有表單提交</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = data.map(s => `
+        <tr>
+            <td>${esc(s.name)}</td>
+            <td>${esc(s.company)}</td>
+            <td>${esc(s.phone)}</td>
+            <td>${esc(s.email)}</td>
+            <td style="max-width:200px; white-space:pre-wrap; font-size:0.82rem;">${esc(s.requirements || '—')}</td>
+            <td style="white-space:nowrap; font-size:0.82rem;">${new Date(s.created_at).toLocaleString('zh-TW')}</td>
+        </tr>
+    `).join('');
+}
+
+// ── 工具函式 ──────────────────────────
+function esc(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+</script>
+</body>
+</html>
