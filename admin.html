@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudVerse 後台管理</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0a0e27;
+            color: #e0e0e0;
+            line-height: 1.6;
+        }
+
+        .login-page {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0a0e27, #050812);
+        }
+
+        .login-box {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 3rem;
+            border-radius: 20px;
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            text-align: center;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-box h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #00d4ff, #ffd700);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .login-box input {
+            width: 100%;
+            padding: 0.8rem;
+            margin-bottom: 1rem;
+            margin-top: 1.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 1rem;
+        }
+
+        .login-box input:focus {
+            outline: none;
+            border-color: #00d4ff;
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 1rem;
+            background: linear-gradient(135deg, #00d4ff, #ffd700);
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .login-btn:hover {
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.4);
+        }
+
+        .admin-container {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            background: rgba(10, 14, 39, 0.8);
+            border-right: 1px solid rgba(0, 212, 255, 0.1);
+            padding: 2rem 0;
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100vh;
+            width: 250px;
+            overflow-y: auto;
+        }
+
+        .sidebar-logo {
+            padding: 0 1.5rem 2rem;
+            font-size: 1.3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #00d4ff, #ffd700);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-align: center;
+        }
+
+        .sidebar-menu {
+            list-style: none;
+        }
+
+        .sidebar-menu li {
+            margin: 0.5rem 0;
+        }
+
+        .sidebar-menu a {
+            display: block;
+            padding: 1rem 1.5rem;
+            color: rgba(224, 224, 224, 0.6);
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-left: 3px solid transparent;
+            user-select: none;
+        }
+
+        .sidebar-menu a:hover {
+            color: #00d4ff;
+            background: rgba(0, 212, 255, 0.1);
+            border-left-color: #00d4ff;
+        }
+
+        .sidebar-menu a.active {
+            color: #00d4ff;
+            background: rgba(0, 212, 255, 0.15);
+            border-left-color: #00d4ff;
+            font-weight: 600;
+        }
+
+        .main-content {
+            margin-left: 250px;
+            padding: 2rem;
+        }
+
+        .content-header h1 {
+            font-size: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .editor-panel {
+            display: none;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            padding: 2rem;
+            border-radius: 15px;
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            margin-bottom: 2rem;
+            width: 100%;
+            max-width: 100%;
+            overflow-x: auto;
+        }
+
+        .editor-panel.active {
+            display: block;
+        }
+
+        .editor-panel h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            color: #00d4ff;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+            width: 100%;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #00d4ff;
+            font-size: 0.95rem;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100% !important;
+            padding: 0.8rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-family: inherit;
+            font-size: 0.95rem;
+            box-sizing: border-box;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #00d4ff;
+            background: rgba(0, 212, 255, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .btn {
+            padding: 0.8rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-save {
+            background: linear-gradient(135deg, #00d4ff, #ffd700);
+            color: #000;
+            flex: 1;
+        }
+
+        .btn-save:hover {
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.4);
+        }
+
+        .message {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .message.show {
+            display: block;
+        }
+
+        .message.success {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+            border: 1px solid rgba(76, 175, 80, 0.5);
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .data-table th {
+            background: rgba(0, 212, 255, 0.1);
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: #00d4ff;
+        }
+
+        .data-table td {
+            padding: 1rem;
+            border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+        }
+
+        .logout-link {
+            display: block;
+            padding: 1rem 1.5rem;
+            color: #f44336;
+            text-decoration: none;
+            cursor: pointer;
+            border-top: 1px solid rgba(0, 212, 255, 0.1);
+            margin-top: 2rem;
+        }
+
+        .logout-link:hover {
+            background: rgba(244, 67, 54, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <!-- 登錄頁面 -->
+    <div id="loginPage" class="login-page">
+        <div class="login-box">
+            <h1>⚡ CloudVerse</h1>
+            <p>後台管理系統</p>
+            <input type="password" id="adminPassword" placeholder="輸入管理員密碼" onkeypress="if(event.key==='Enter') handleLogin()" />
+            <button class="login-btn" onclick="handleLogin()">進入管理後台</button>
+            <p style="margin-top: 1rem; font-size: 0.85rem; color: rgba(224,224,224,0.5);">
+                密碼：<strong>admin123</strong>
+            </p>
+        </div>
+    </div>
+
+    <!-- 管理後台 -->
+    <div id="adminPanel" class="admin-container" style="display: none;">
+        <!-- 側邊欄 -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">管理後台</div>
+            <ul class="sidebar-menu">
+                <li><a class="menu-item active" onclick="switchPanel('hero', this)">✏️ Hero 區塊</a></li>
+                <li><a class="menu-item" onclick="switchPanel('services', this)">🔧 服務卡片</a></li>
+                <li><a class="menu-item" onclick="switchPanel('stats', this)">📊 統計數據</a></li>
+                <li><a class="menu-item" onclick="switchPanel('submissions', this)">📋 表單提交</a></li>
+                <li><a class="logout-link" onclick="handleLogout()">🚪 登出</a></li>
+            </ul>
+        </aside>
+
+        <!-- 主內容 -->
+        <main class="main-content">
+            <div class="content-header">
+                <h1>內容管理系統</h1>
+                <div id="messageBox" class="message"></div>
+            </div>
+
+            <!-- Hero 面板 -->
+            <div id="heroPanel" class="editor-panel active">
+                <h2>編輯 Hero 區塊</h2>
+                <div class="form-group">
+                    <label>主標題</label>
+                    <input type="text" id="heroTitle" />
+                </div>
+                <div class="form-group">
+                    <label>副標題</label>
+                    <input type="text" id="heroSubtitle" />
+                </div>
+                <div class="form-group">
+                    <label>描述</label>
+                    <textarea id="heroDescription"></textarea>
+                </div>
+                <div class="button-group">
+                    <button class="btn btn-save" onclick="saveHero()">保存</button>
+                </div>
+            </div>
+
+            <!-- Services 面板 -->
+            <div id="servicesPanel" class="editor-panel">
+                <h2>編輯服務卡片</h2>
+                <div id="servicesContainer"></div>
+                <div class="button-group">
+                    <button class="btn btn-save" onclick="saveServices()">保存服務</button>
+                </div>
+            </div>
+
+            <!-- Stats 面板 -->
+            <div id="statsPanel" class="editor-panel">
+                <h2>編輯統計數據</h2>
+                <div id="statsContainer"></div>
+                <div class="button-group">
+                    <button class="btn btn-save" onclick="saveStats()">保存統計</button>
+                </div>
+            </div>
+
+            <!-- 表單提交面板 -->
+            <div id="submissionsPanel" class="editor-panel">
+                <h2>表單提交記錄</h2>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>姓名</th>
+                            <th>公司</th>
+                            <th>電話</th>
+                            <th>電郵</th>
+                            <th>日期</th>
+                        </tr>
+                    </thead>
+                    <tbody id="submissionsTable"></tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://euirazpintnlbfhymtbj.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV1aXJhenBpbnRubGJmaHltdGJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNTE4NTksImV4cCI6MjA5NDgyNzg1OX0.7RHJ2CYkkHoxL-x51tfqVUzuTJJkHGJQSsihzXCRtpg';
+
+        let supabaseClient = null;
+        let isLoggedIn = false;
+
+        try {
+            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            console.log('✅ Supabase 後台已初始化');
+        } catch (error) {
+            console.error('❌ Supabase 初始化失敗：', error);
+        }
+
+        function handleLogin() {
+            const password = document.getElementById('adminPassword').value;
+            if (password === 'admin123') {
+                isLoggedIn = true;
+                document.getElementById('loginPage').style.display = 'none';
+                document.getElementById('adminPanel').style.display = 'grid';
+                loadAllData();
+                console.log('✅ 登入成功');
+            } else {
+                alert('密碼錯誤！');
+                console.error('❌ 密碼錯誤');
+            }
+        }
+
+        function handleLogout() {
+            isLoggedIn = false;
+            document.getElementById('loginPage').style.display = 'flex';
+            document.getElementById('adminPanel').style.display = 'none';
+            document.getElementById('adminPassword').value = '';
+        }
+
+        function switchPanel(panelName, element) {
+            // 隱藏所有面板
+            document.querySelectorAll('.editor-panel').forEach(panel => {
+                panel.classList.remove('active');
+            });
+
+            // 移除所有菜單項的 active 狀態
+            document.querySelectorAll('.sidebar-menu a').forEach(link => {
+                link.classList.remove('active');
+            });
+
+            // 顯示選定面板
+            const panel = document.getElementById(panelName + 'Panel');
+            if (panel) {
+                panel.classList.add('active');
+            }
+
+            // 標記菜單項為 active
+            if (element) {
+                element.classList.add('active');
+            }
+
+            console.log('✅ 切換到：' + panelName);
+        }
+
+        async function loadAllData() {
+            console.log('⏳ 正在加載所有數據...');
+            await loadHeroData();
+            await loadServicesData();
+            await loadStatsData();
+            await loadSubmissionsData();
+            console.log('✅ 所有數據加載完成');
+        }
+
+        async function loadHeroData() {
+            try {
+                console.log('📄 加載 Hero 數據...');
+                const { data, error } = await supabaseClient.from('content_hero').select('*').limit(1).single();
+
+                if (error) {
+                    console.error('❌ Supabase 錯誤：', error);
+                    return;
+                }
+
+                if (data) {
+                    console.log('✅ Hero 數據：', data);
+                    document.getElementById('heroTitle').value = data.title || '';
+                    document.getElementById('heroSubtitle').value = data.subtitle || '';
+                    document.getElementById('heroDescription').value = data.description || '';
+                }
+            } catch (error) {
+                console.error('❌ 加載 Hero 異常：', error);
+            }
+        }
+
+        async function loadServicesData() {
+            try {
+                console.log('📄 加載 Services 數據...');
+                const { data, error } = await supabaseClient.from('content_services').select('*').order('service_order');
+
+                if (error) {
+                    console.error('❌ Supabase 錯誤：', error);
+                    return;
+                }
+
+                const container = document.getElementById('servicesContainer');
+                if (data && data.length > 0) {
+                    console.log('✅ Services 數據：', data);
+                    container.innerHTML = data.map(s => `
+                        <div style="border: 1px solid rgba(0,212,255,0.1); padding: 1rem; margin: 1rem 0; border-radius: 8px;">
+                            <h4 style="color: #00d4ff; margin-bottom: 1rem;">服務 ${s.service_order}</h4>
+                            <div class="form-group">
+                                <label>標題</label>
+                                <input type="text" value="${s.title || ''}" onchange="updateService(${s.id}, 'title', this.value)" />
+                            </div>
+                            <div class="form-group">
+                                <label>描述</label>
+                                <textarea onchange="updateService(${s.id}, 'description', this.value)">${s.description || ''}</textarea>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<p>沒有數據</p>';
+                }
+            } catch (error) {
+                console.error('❌ 加載 Services 異常：', error);
+            }
+        }
+
+        async function loadStatsData() {
+            try {
+                console.log('📄 加載 Stats 數據...');
+                const { data, error } = await supabaseClient.from('content_stats').select('*').order('stat_order');
+
+                if (error) {
+                    console.error('❌ Supabase 錯誤：', error);
+                    return;
+                }
+
+                const container = document.getElementById('statsContainer');
+                if (data && data.length > 0) {
+                    console.log('✅ Stats 數據：', data);
+                    container.innerHTML = data.map(s => `
+                        <div style="border: 1px solid rgba(0,212,255,0.1); padding: 1rem; margin: 1rem 0; border-radius: 8px;">
+                            <h4 style="color: #00d4ff; margin-bottom: 1rem;">統計 ${s.stat_order}</h4>
+                            <div class="form-group">
+                                <label>數字</label>
+                                <input type="text" value="${s.number || ''}" onchange="updateStat(${s.id}, 'number', this.value)" />
+                            </div>
+                            <div class="form-group">
+                                <label>標籤</label>
+                                <input type="text" value="${s.label || ''}" onchange="updateStat(${s.id}, 'label', this.value)" />
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<p>沒有數據</p>';
+                }
+            } catch (error) {
+                console.error('❌ 加載 Stats 異常：', error);
+            }
+        }
+
+        async function loadSubmissionsData() {
+            try {
+                console.log('📄 加載表單提交數據...');
+                const { data, error } = await supabaseClient.from('form_submissions').select('*').order('created_at', { ascending: false });
+
+                if (error) {
+                    console.error('❌ Supabase 錯誤：', error);
+                    return;
+                }
+
+                const tbody = document.getElementById('submissionsTable');
+                if (data && data.length > 0) {
+                    console.log('✅ 表單提交數據：', data);
+                    tbody.innerHTML = data.map(s => `
+                        <tr>
+                            <td>${s.name || ''}</td>
+                            <td>${s.company || ''}</td>
+                            <td>${s.phone || ''}</td>
+                            <td>${s.email || ''}</td>
+                            <td>${new Date(s.created_at).toLocaleString('zh-TW')}</td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem;">還沒有表單提交</td></tr>';
+                }
+            } catch (error) {
+                console.error('❌ 加載提交異常：', error);
+            }
+        }
+
+        async function saveHero() {
+            try {
+                console.log('💾 正在保存 Hero...');
+                const title = document.getElementById('heroTitle').value;
+                const subtitle = document.getElementById('heroSubtitle').value;
+                const description = document.getElementById('heroDescription').value;
+
+                const { error } = await supabaseClient.from('content_hero').update({
+                    title: title,
+                    subtitle: subtitle,
+                    description: description
+                }).eq('id', 1);
+
+                if (error) {
+                    console.error('❌ 保存錯誤：', error);
+                    showMessage('❌ 保存失敗', 'error');
+                } else {
+                    console.log('✅ Hero 已保存');
+                    showMessage('✅ Hero 已保存！請回到前端重新整理查看更新', 'success');
+                }
+            } catch (error) {
+                console.error('❌ 保存異常：', error);
+                showMessage('❌ 保存失敗：' + error.message, 'error');
+            }
+        }
+
+        async function saveServices() {
+            showMessage('✅ 每次修改都會自動保存', 'success');
+        }
+
+        async function saveStats() {
+            showMessage('✅ 每次修改都會自動保存', 'success');
+        }
+
+        async function updateService(id, field, value) {
+            try {
+                console.log(`💾 更新 Service ${id} 的 ${field}...`);
+                const { error } = await supabaseClient.from('content_services').update({ [field]: value }).eq('id', id);
+
+                if (error) {
+                    console.error('❌ 更新錯誤：', error);
+                } else {
+                    console.log(`✅ Service ${id} 已更新`);
+                    showMessage('✅ 已保存', 'success');
+                }
+            } catch (error) {
+                console.error('❌ 更新異常：', error);
+            }
+        }
+
+        async function updateStat(id, field, value) {
+            try {
+                console.log(`💾 更新 Stat ${id} 的 ${field}...`);
+                const { error } = await supabaseClient.from('content_stats').update({ [field]: value }).eq('id', id);
+
+                if (error) {
+                    console.error('❌ 更新錯誤：', error);
+                } else {
+                    console.log(`✅ Stat ${id} 已更新`);
+                    showMessage('✅ 已保存', 'success');
+                }
+            } catch (error) {
+                console.error('❌ 更新異常：', error);
+            }
+        }
+
+        function showMessage(msg, type) {
+            const box = document.getElementById('messageBox');
+            box.textContent = msg;
+            box.className = `message ${type} show`;
+            setTimeout(() => {
+                box.classList.remove('show');
+            }, 3000);
+        }
+
+        window.addEventListener('load', () => {
+            console.log('✅ 後台管理系統已加載');
+
+            // 初始化第一個菜單項為 active
+            const firstMenu = document.querySelector('.sidebar-menu a');
+            if (firstMenu) {
+                firstMenu.classList.add('active');
+                document.getElementById('heroPanel').classList.add('active');
+            }
+        });
+    </script>
+</body>
+</html>
